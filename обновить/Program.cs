@@ -7,16 +7,18 @@ class Program
 {
     static void Main()
     {
+        string currentDirectory = Directory.GetCurrentDirectory();
+        string folderName = ".git";
+        string folderPath = Path.Combine(currentDirectory, folderName);
 
         // Проверка, установлен ли git
-        if (IsGitInstalled())
+        if (IsGitInstalled() && Directory.Exists(folderPath))
         {
             Console.WriteLine("Git установлен, выполняю git pull...");
             try
             {
                 ExecuteCommand("git pull");
                 Console.WriteLine("Команда выполнена успешно, проект обновлен!");
-                Console.ReadKey();
             }
             catch (Exception ex)
             {
@@ -34,10 +36,26 @@ class Program
 
     static void DownloadArchive() 
     {
-        Console.WriteLine("Git не установлен. Загружается архив...");
-        string url = "https://github.com/Processori7/FreeAiChromeSidebar/archive/refs/heads/master.zip";
-        string zipFile = "freeaichromesidebar-master.zip";
-        string extractDir = "freeAiChromeSidebar-master";
+        Console.WriteLine("Git не установлен или не инициализирован репозиторий. Загружается архив...");
+        string currentDirectory = Directory.GetCurrentDirectory();
+        string fileName = "service-worker.js";
+        string filePath = Path.Combine(currentDirectory, fileName);
+
+        string url = "";
+        string zipFile = "";
+        string extractDir = "";
+        if (File.Exists(filePath))
+        {
+            url = "https://github.com/Processori7/FreeAiChromeSidebar/archive/refs/heads/master.zip";
+            zipFile = "freeaichromesidebar-master.zip";
+            extractDir = "freeAiChromeSidebar-master";
+        }
+        else 
+        {
+            url = "https://github.com/Processori7/FreeAi_Mozila_Ext/archive/refs/heads/master.zip";
+            zipFile = "FreeAi_Mozila_Ext.zip";
+            extractDir = "FreeAi_Mozila_Ext-master";
+        }
 
         // Загрузка архива
         using (WebClient client = new WebClient())
@@ -74,13 +92,6 @@ class Program
         {
             Console.WriteLine($"Копирование содержимого");
 
-            // Показать файлы в распакованной папке
-            Console.WriteLine($"Содержимое папки \"{extractDir}\":");
-            foreach (var file in Directory.GetFiles($"{extractDir}\\{extractDir}"))
-            {
-                Console.WriteLine(Path.GetFileName(file));
-            }
-            string currentDirectory = Directory.GetCurrentDirectory();
             foreach (var file in Directory.GetFiles($"{extractDir}\\{extractDir}"))
             {
                 string destFile = Path.Combine(currentDirectory, Path.GetFileName(file));
