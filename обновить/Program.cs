@@ -1,9 +1,11 @@
-﻿using System.Diagnostics;
-using System.Net;
-using Microsoft.Win32;
-using System.IO.Compression;
-using System.Reflection;
+﻿using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
+using System.IO.Compression;
+using System.Net;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
 
 
 [assembly: AssemblyCompany("Processor")]
@@ -29,7 +31,6 @@ class Program
 
         if (args.Length > 0 && args[0] == "--start")
         {
-            // Проверяем, добавлена ли уже в автозагрузку
             using (RegistryKey key = Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run"))
             {
                 if (key?.GetValue(AppName) == null)
@@ -38,8 +39,8 @@ class Program
                 }
             }
 
-            // Продолжаем выполнение программы
             silent = true;
+            ShowConsoleIfNotSilent(silent);
             RunUpdateProcess(silent);
             return;
         }
@@ -47,6 +48,7 @@ class Program
         if (args.Length > 0 && args[0] == "--silent")
         {
             silent = true;
+            ShowConsoleIfNotSilent(silent);
             RunUpdateProcess(silent);
             return;
         }
@@ -55,12 +57,48 @@ class Program
         RunUpdateProcess(silent);
     }
 
+    // Вспомогательная функция
+    static void ShowConsoleIfNotSilent(bool silent)
+    {
+        if (!silent)
+        {
+            ConsoleHelper.ShowConsole();
+        }
+    }
+
+    public static class ConsoleHelper
+    {
+        [DllImport("kernel32.dll")]
+        private static extern bool AttachConsole(int dwProcessId);
+
+        private const int ATTACH_PARENT_PROCESS = -1;
+
+        public static void ShowConsole()
+        {
+            if (AttachConsole(ATTACH_PARENT_PROCESS))
+            {
+                Console.OutputEncoding = Encoding.UTF8;
+            }
+        }
+
+        public static void HideConsole()
+        {
+            // Не реализуется напрямую — просто не вызываем ShowConsole()
+        }
+    }
+
     static void RunUpdateProcess(bool silent)
     {
+        if (!silent)
+        {
+            Console.WriteLine("Запуск программы...");
+        }
+
         string appPath = Process.GetCurrentProcess().MainModule.FileName;
         string currentDirectory = Path.GetDirectoryName(appPath);
 
         CheckForUpdates(silent);
+
         string folderName = ".git";
         string folderPath = Path.Combine(currentDirectory, folderName);
 
@@ -79,8 +117,7 @@ class Program
         }
         catch (Exception ex)
         {
-            if (!silent)
-                Console.WriteLine($"Ошибка обновления: {ex.Message}");
+            if (!silent) Console.WriteLine($"Ошибка обновления: {ex.Message}");
         }
 
         if (!silent)
