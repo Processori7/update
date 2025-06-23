@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34728.123
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "обновить", "обновить\обновить.csproj", "{F63DD1FE-E766-4392-A41B-0D5DCCB34764}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FreeAiServicesUpdateApp", "обновить\FreeAiServicesUpdateApp.csproj", "{F63DD1FE-E766-4392-A41B-0D5DCCB34764}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
