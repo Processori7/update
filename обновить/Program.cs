@@ -10,13 +10,13 @@ using System.Text;
 
 [assembly: AssemblyCompany("Processor")]
 [assembly: AssemblyProduct("FreeAi Services Updater")]
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
-[assembly: AssemblyInformationalVersion("1.2.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyInformationalVersion("1.3.0")]
 
 class Program
 {
-    const string CurrentVersion = "1.2";
+    const string CurrentVersion = "1.3";
     const string AppName = "FreeAiServicesUpdaterApp";
 
     static void Main(string[] args)
@@ -40,7 +40,6 @@ class Program
             }
 
             silent = true;
-            ShowConsoleIfNotSilent(silent);
             RunUpdateProcess(silent);
             return;
         }
@@ -48,7 +47,6 @@ class Program
         if (args.Length > 0 && args[0] == "--silent")
         {
             silent = true;
-            ShowConsoleIfNotSilent(silent);
             RunUpdateProcess(silent);
             return;
         }
@@ -57,33 +55,64 @@ class Program
         RunUpdateProcess(silent);
     }
 
-    // Вспомогательная функция
-    static void ShowConsoleIfNotSilent(bool silent)
+    static string GetCurrentManifestVersion(bool silent)
     {
-        if (!silent)
+        string currentDirectory = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+        string manifestPath = Path.Combine(currentDirectory, "manifest.json");
+        if (!File.Exists(manifestPath))
         {
-            ConsoleHelper.ShowConsole();
+            if (!silent) Console.WriteLine("Файл manifest.json не найден.");
+            return null;
+        }
+        try
+        {
+            string json = File.ReadAllText(manifestPath);
+            JObject manifest = JObject.Parse(json);
+            return manifest["version"]?.ToString();
+        }
+        catch (Exception ex)
+        {
+            if (!silent) Console.WriteLine("Ошибка чтения manifest.json: " + ex.Message);
+            return null;
         }
     }
 
-    public static class ConsoleHelper
+    static string GetLatestRepoVersion(string repoName, bool silent)
     {
-        [DllImport("kernel32.dll")]
-        private static extern bool AttachConsole(int dwProcessId);
-
-        private const int ATTACH_PARENT_PROCESS = -1;
-
-        public static void ShowConsole()
+        try
         {
-            if (AttachConsole(ATTACH_PARENT_PROCESS))
+            string apiUrl = $"https://api.github.com/repos/Processori7/{repoName}/contents/manifest.json";
+            var request = (HttpWebRequest)WebRequest.Create(apiUrl);
+            request.UserAgent = "UpdaterApp";
+
+            using (var response = (HttpWebResponse)request.GetResponse())
+            using (var reader = new StreamReader(response.GetResponseStream()))
             {
-                Console.OutputEncoding = Encoding.UTF8;
+                string json = reader.ReadToEnd();
+                JObject content = JObject.Parse(json);
+
+                // Получаем содержимое файла в Base64
+                string base64Content = content["content"]?.ToString();
+
+                if (string.IsNullOrEmpty(base64Content))
+                {
+                    if (!silent) Console.WriteLine("Не удалось получить содержимое manifest.json.");
+                    return null;
+                }
+
+                // Декодируем Base64
+                byte[] data = Convert.FromBase64String(base64Content);
+                string manifestJson = Encoding.UTF8.GetString(data);
+
+                // Парсим JSON манифеста
+                JObject manifest = JObject.Parse(manifestJson);
+                return manifest["version"]?.ToString();
             }
         }
-
-        public static void HideConsole()
+        catch (Exception ex)
         {
-            // Не реализуется напрямую — просто не вызываем ShowConsole()
+            if (!silent) Console.WriteLine($"Ошибка получения версии из репозитория {repoName}: {ex.Message}");
+            return null;
         }
     }
 
@@ -102,28 +131,60 @@ class Program
         string folderName = ".git";
         string folderPath = Path.Combine(currentDirectory, folderName);
 
-        try
+        string manifestType = GetManifestType(silent);
+        string currentManifestVersion = GetCurrentManifestVersion(silent);
+
+        string repoName = (manifestType == "chrome")
+            ? "FreeAiChromeSidebar"
+            : "FreeAi_Yandex_Opera_Ext";
+
+        string latestVersion = GetLatestRepoVersion(repoName, silent);
+
+        if (!string.IsNullOrEmpty(currentManifestVersion) && !string.IsNullOrEmpty(latestVersion))
         {
-            if (IsGitInstalled() && Directory.Exists(folderPath))
+            if (currentManifestVersion != latestVersion)
             {
-                if (!silent) Console.WriteLine("Выполняется git pull...");
-                ExecuteCommand("git pull", silent);
-                if (!silent) Console.WriteLine("Репозиторий обновлён.");
+                if (!silent)
+                {
+                    Console.WriteLine($"Обнаружена новая версия: {latestVersion}. Текущая: {currentManifestVersion}");
+                }
+
+                // Пытаемся обновиться через git, если есть, иначе через архив
+                if (IsGitInstalled() && Directory.Exists(folderPath))
+                {
+                    try
+                    {
+                        if (!silent) Console.WriteLine("Выполняется git pull...");
+                        ExecuteCommand("git pull", silent);
+                        if (!silent) Console.WriteLine("Репозиторий успешно обновлён.");
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!silent) Console.WriteLine($"Ошибка при git pull: {ex.Message}. Перехожу к загрузке архива...");
+
+                        DownloadArchive(silent);
+                    }
+                }
+                else
+                {
+                    DownloadArchive(silent);
+                }
             }
             else
             {
-                DownloadArchive(silent);
+                if (!silent) Console.WriteLine("Расширение уже актуально.");
             }
         }
-        catch (Exception ex)
+        else
         {
-            if (!silent) Console.WriteLine($"Ошибка обновления: {ex.Message}");
+            if (!silent) Console.WriteLine("Не удалось сравнить версии. Выполняется стандартное обновление...");
+            DownloadArchive(silent);
         }
 
         if (!silent)
         {
             Console.WriteLine("Обновление расширения завершено.");
-            Console.ReadKey();
+            //Console.ReadKey();
         }
     }
 
